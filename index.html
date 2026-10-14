@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#050806">
+    <meta name="theme-color" content="#cfe8b0">
     <meta name="description" content="Cuenta botellas de plástico con un clasificador local. Usa la cámara o sube una foto. La imagen no sale del dispositivo.">
     <meta property="og:type" content="website">
     <meta property="og:title" content="Botellas IA — ¿Hay botellas?">
@@ -29,6 +29,7 @@
       <nav class="nav" aria-label="Navegación principal">
         <a href="#clasificador" class="focus-ring"><i class="bx bx-camera" aria-hidden="true"></i>Jugar</a>
         <a href="#mapa-basureros" class="focus-ring"><i class="bx bx-map" aria-hidden="true"></i>Mapa</a>
+        <a href="cuaderno/Clasificador_de_botellas.html" class="focus-ring cuaderno"><i class="bx bx-book-open" aria-hidden="true"></i>Cuaderno</a>
         <button id="install-app" type="button" class="boton boton-chico hidden"><i class="bx bx-download" aria-hidden="true"></i><span class="solo-ancho">Instalar</span></button>
         <p class="marcador" aria-label="Botellas acumuladas"><img src="assets/icono.png" alt="" width="28" height="28"><strong id="marcador-total">0</strong></p>
       </nav>
@@ -177,11 +178,11 @@
       (() => {
         "use strict";
 
-        const SIZE = 400;
+        const SIZE = 640;
         const INVENTORY_KEY = "botellas-ia-inventario-v1";
         const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
         const UMBRAL_POCO_SEGURO = 0.6;
-        const UMBRAL_BOTELLA = 0.5;
+        const UMBRAL_BOTELLA = 0.4;
         const elements = {
           video: document.getElementById("video"),
           canvas: document.getElementById("canvas"),
@@ -240,6 +241,11 @@
         const buffer = document.createElement("canvas");
         buffer.width = SIZE;
         buffer.height = SIZE;
+        const lienzo = document.getElementById("canvas");
+        if (lienzo) {
+          lienzo.width = SIZE;
+          lienzo.height = SIZE;
+        }
 
         function setStatus(message, isError = false) {
           elements.status.textContent = message;
@@ -296,7 +302,7 @@
 
         async function openStream() {
           const attempts = [
-            { audio: false, video: { facingMode: { ideal: facingMode }, width: { ideal: SIZE }, height: { ideal: SIZE } } },
+            { audio: false, video: { facingMode: { ideal: facingMode }, width: { ideal: 1280 }, height: { ideal: 720 } } },
             { audio: false, video: { facingMode } },
             { audio: false, video: true }
           ];
@@ -357,7 +363,10 @@
 
         function showSelectedPhoto(file) {
           if (!file) return;
-          if (!["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) {
+          const nombre = file.name.toLowerCase();
+          const fotoValida = ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)
+            || [".jpg", ".jpeg", ".png", ".webp", ".gif"].some((ext) => nombre.endsWith(ext));
+          if (!fotoValida) {
             setStatus("Formato no compatible. Elige una imagen JPG, PNG, WEBP o GIF.", true);
             elements.upload.value = "";
             return;
@@ -398,8 +407,12 @@
           image.src = url;
         }
 
-        function esperarVideo(nombre, limiteMs = 2000) {
+        function esperarVideo(nombre, limiteMs = 8000) {
           return new Promise((resolve, reject) => {
+            if (nombre === "loadeddata" && elements.video.readyState >= 2 && elements.video.videoWidth) {
+              resolve();
+              return;
+            }
             let timer = 0;
             const limpiar = () => {
               clearTimeout(timer);
@@ -412,9 +425,13 @@
             };
             const fallo = () => {
               limpiar();
-              reject(new Error("No se pudo leer el video."));
+              reject(new Error("No se pudo leer el video. Prueba con un MP4."));
             };
-            timer = setTimeout(listo, limiteMs);
+            timer = setTimeout(() => {
+              limpiar();
+              if (elements.video.videoWidth) resolve();
+              else reject(new Error("No se pudo leer el video. Prueba con un MP4."));
+            }, limiteMs);
             elements.video.addEventListener(nombre, listo, { once: true });
             elements.video.addEventListener("error", fallo, { once: true });
           });
@@ -481,7 +498,7 @@
           const orden = [...cajas].sort((a, b) => b.score - a.score);
           const quedan = [];
           for (const caja of orden) {
-            if (caja.w < 24 || caja.h < 36) continue;
+            if (caja.w < 16 || caja.h < 20) continue;
             if (quedan.every((otra) => interseccion(caja, otra) < 0.45)) quedan.push(caja);
           }
           return quedan;
@@ -516,30 +533,37 @@
         }
 
         function dibujarEnCanvas(canvas, source, cajas) {
+          const anchoReal = source.videoWidth || source.naturalWidth || source.width || SIZE;
+          const altoReal = source.videoHeight || source.naturalHeight || source.height || SIZE;
+          const escala = Math.min(1, 960 / Math.max(anchoReal, altoReal));
+          const ancho = Math.max(1, Math.round(anchoReal * escala));
+          const alto = Math.max(1, Math.round(altoReal * escala));
+          if (canvas.width !== ancho) canvas.width = ancho;
+          if (canvas.height !== alto) canvas.height = alto;
           const context = canvas.getContext("2d", { willReadFrequently: true });
           context.setTransform(1, 0, 0, 1, 0, 0);
-          context.fillStyle = "#f2f0e9";
-          context.fillRect(0, 0, SIZE, SIZE);
+          context.fillStyle = "#e7f6c8";
+          context.fillRect(0, 0, ancho, alto);
           context.save();
           if (source === elements.video && stream && facingMode === "user") {
-            context.translate(SIZE, 0);
+            context.translate(ancho, 0);
             context.scale(-1, 1);
           }
-          context.drawImage(source, 0, 0, SIZE, SIZE);
+          context.drawImage(source, 0, 0, ancho, alto);
           context.restore();
-          context.lineWidth = 3;
-          context.font = "700 16px Nunito, sans-serif";
+          context.lineWidth = 4;
+          context.font = "700 18px Outfit, sans-serif";
           context.textBaseline = "top";
           for (const caja of cajas) {
-            context.strokeStyle = caja.registrada ? "#8a6a12" : "#46765a";
+            context.strokeStyle = caja.registrada ? "#8a6a12" : "#1f7a34";
             context.strokeRect(caja.x, caja.y, caja.w, caja.h);
             const texto = caja.registrada ? "ya registrada" : `botella ${Math.round(caja.score * 100)}%`;
             const ancho = context.measureText(texto).width;
-            const y = caja.y > 22 ? caja.y - 22 : caja.y;
-            context.fillStyle = caja.registrada ? "#8a6a12" : "#46765a";
-            context.fillRect(caja.x, y, ancho + 10, 22);
-            context.fillStyle = "#f7f5ef";
-            context.fillText(texto, caja.x + 5, y + 2);
+            const y = caja.y > 26 ? caja.y - 26 : caja.y;
+            context.fillStyle = caja.registrada ? "#8a6a12" : "#1f7a34";
+            context.fillRect(caja.x, y, ancho + 12, 24);
+            context.fillStyle = "#f7fff2";
+            context.fillText(texto, caja.x + 6, y + 3);
           }
         }
 
@@ -667,8 +691,8 @@
           setStatus(records.length === 1 ? "1 botella nueva en el inventario." : `${records.length} botellas nuevas en el inventario.`);
         }
 
-        async function confirmarQueEsBotella(canvas) {
-          if (!model || !window.tf) return true;
+        async function puntajeRecorte(source, caja) {
+          if (!model || !window.tf) return 1;
           let input;
           let output;
           try {
@@ -676,8 +700,19 @@
               const scaled = document.createElement("canvas");
               scaled.width = 100;
               scaled.height = 100;
-              scaled.getContext("2d", { willReadFrequently: true }).drawImage(canvas, 0, 0, 100, 100);
-              const rgba = scaled.getContext("2d", { willReadFrequently: true }).getImageData(0, 0, 100, 100).data;
+              const ctx = scaled.getContext("2d", { willReadFrequently: true });
+              ctx.drawImage(
+                source,
+                Math.max(0, caja.x),
+                Math.max(0, caja.y),
+                Math.max(1, caja.w),
+                Math.max(1, caja.h),
+                0,
+                0,
+                100,
+                100
+              );
+              const rgba = ctx.getImageData(0, 0, 100, 100).data;
               const grayscale = new Float32Array(10000);
               for (let pixel = 0; pixel < grayscale.length; pixel += 1) {
                 const offset = pixel * 4;
@@ -687,11 +722,26 @@
             });
             output = model.predict(input);
             const prediction = await output.data();
-            return Number.isFinite(prediction[0]) && prediction[0] > 0.5;
+            return Number.isFinite(prediction[0]) ? prediction[0] : 1;
+          } catch (error) {
+            console.warn("No se pudo confirmar el recorte:", error);
+            return 1;
           } finally {
             if (input) input.dispose();
             if (output && typeof output.dispose === "function") output.dispose();
           }
+        }
+
+        async function confirmarCajas(source, cajas) {
+          if (!model || !cajas.length) return cajas;
+          const aceptadas = [];
+          for (const caja of cajas) {
+            const puntaje = await puntajeRecorte(source, caja);
+            if (puntaje >= 0.28 || caja.score >= 0.45) {
+              aceptadas.push({ ...caja, score: Math.max(caja.score, puntaje) });
+            }
+          }
+          return aceptadas;
         }
 
         async function leerBotellas(source) {
@@ -714,7 +764,9 @@
           if (!bottleDetector || detectando) return;
           detectando = true;
           try {
-            const { cajas, persona } = await leerBotellas(source);
+            const leidas = await leerBotellas(source);
+            const cajas = await confirmarCajas(buffer, leidas.cajas);
+            const persona = leidas.persona;
             if (opciones.foto) {
               await registrarFoto(cajas, persona, source);
               return;
@@ -726,15 +778,6 @@
               if (!cajas.length && persona && opciones.aviso) {
                 setStatus("Se ve una persona, no una botella. Solo se registra la clase bottle.", true);
               }
-              return;
-            }
-            const esBotella = await confirmarQueEsBotella(buffer);
-            if (!esBotella) {
-              nuevas.forEach((rastro) => {
-                rastro.registrado = false;
-                rastro.rechazado = true;
-              });
-              setStatus("Eso no se confirmó como botella. Solo entra al inventario la clase bottle.", true);
               return;
             }
             registrarNuevas(nuevas, Boolean(opciones.silencio));
@@ -763,13 +806,6 @@
             dibujarEnCanvas(elements.canvas, source, cajasVisibles);
             setStatus("Esas mismas botellas ya están en el inventario.", true);
             abrirModal(0, "No se agregó nada. Esas botellas ya estaban registradas.");
-            return;
-          }
-          const esBotella = await confirmarQueEsBotella(buffer);
-          if (!esBotella) {
-            setStatus("El clasificador no confirma que sea una botella. No se guardó.", true);
-            elements.resultLabel.textContent = "No es una botella";
-            elements.resultIcon.innerHTML = '<i class="bx bx-x-circle"></i>';
             return;
           }
           ultimaFirma = firma;

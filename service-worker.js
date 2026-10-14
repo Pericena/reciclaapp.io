@@ -4,7 +4,7 @@
  * y los CDN se reutilizan si ya se visitaron.
  * model.json y los dos .bin ya están entrenados y entran en la carcasa.
  */
-const SHELL_CACHE = "botellas-shell-v7";
+const SHELL_CACHE = "botellas-shell-v8";
 const EXTERNAL_CACHE = "botellas-external-v1";
 const APP_FILES = [
   "./",
@@ -14,6 +14,7 @@ const APP_FILES = [
   "./assets/botellas.svg",
   "./assets/icono.png",
   "./assets/icon-pwa.svg",
+  "./js/mapa.js",
   "./manifest.webmanifest",
   "./modelo_botellas/model.json",
   "./modelo_botellas/group1-shard1of2.bin",
@@ -67,13 +68,12 @@ self.addEventListener("fetch", (event) => {
 
   event.respondWith((async () => {
     const cached = await caches.match(request);
-    if (cached && request.mode !== "navigate") return cached;
     try {
       const response = await fetch(request);
-      if (response.ok && requestUrl.pathname.endsWith(".html")) {
+      if (response.ok) {
         const cache = await caches.open(SHELL_CACHE);
         cache.put(request, response.clone()).catch((error) => {
-          console.warn("No se pudo actualizar la página guardada:", error);
+          console.warn("No se pudo actualizar el archivo guardado:", error);
         });
       }
       return response;
