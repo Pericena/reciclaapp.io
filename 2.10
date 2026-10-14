@@ -1,2 +1,0 @@
-Requirement already satisfied: Jinja2 in c:\users\lperi\appdata\local\packages\pythonsoftwarefoundation.python.3.10_qbz5n2kfra8p0\localcache\local-packages\python310\site-packages (3.0.0)
-Requirement already satisfied: MarkupSafe>=2.0.0rc2 in c:\users\lperi\appdata\local\packages\pythonsoftwarefoundation.python.3.10_qbz5n2kfra8p0\localcache\local-packages\python310\site-packages (from Jinja2) (2.1.1)

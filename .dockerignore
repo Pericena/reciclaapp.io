@@ -1,0 +1,12 @@
+.git
+.github
+datasets
+img
+dato
+clasificador
+entrenamiento
+video_feed
+**/__pycache__
+**/*.mp4
+README.md
+docs
